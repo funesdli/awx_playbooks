@@ -10,9 +10,9 @@
     testlink_db_name: 'testlinkDB'
     testlink_db_user: 'userTL'
     testlink_db_password: 'N3twork!'
-    nginx_testlink_path: 
-    nginx_user: 
-    item: 
+    nginx_testlink_path: '/nginx'
+    nginx_user: 'admin'
+    item: '/testlink'
 
   tasks:
   
