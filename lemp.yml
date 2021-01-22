@@ -1,0 +1,136 @@
+---
+- hosts: all
+  become: yes
+
+  vars: 
+    mysql_root_password: 'N3twork!'
+
+## installation de NGINX
+  tasks:
+    - name: Add Nginx to source.list
+      lineinfile:
+        path: /etc/apt/sources.list
+        line: 'deb http://nginx.org/packages/mainline/debian/ stretch nginx'
+    
+    - name: Import Nginx repository’s package signing key and add it to apt
+      command: sudo wget http://nginx.org/keys/nginx_signing.key; sudo apt-key add nginx_signing.key
+
+    - name: apt upgrade & update
+      shell: apt-get upgrade -y; apt-get update
+
+    - name: Install NGINX
+      apt: 
+        name: nginx 
+        state: latest
+
+    - name: start nginx
+      service:
+        name: nginx
+        state: started
+    
+    - name: Enable service nginx
+      ansible.builtin.systemd:
+        name: nginx
+        enabled: yes
+    
+    - name: Enable ufw
+      ufw: state=enabled
+    
+    - name: changing default incoming policy to 'deny'
+      shell: sudo ufw default deny
+    
+    - name: autoriser les connexions à Nginx
+      ufw: 
+        rule: allow
+        name: 'Nginx HTTP'
+      #shell: sudo ufw allow 'Nginx HTTP'
+
+## installation de mariadb
+    - name: Install mariadb
+      apt:
+        name: mariadb-server,php7.0-mysql
+        state: latest
+
+    - name: Start the mariadb service
+      action: service name=mariadb state=started
+
+    - name: Enable service mariadb
+      ansible.builtin.systemd:
+        name: mariadb
+        enabled: yes      
+  
+  # mysql_secure_installation
+    # - name: Sets the root password 
+    #   mysql_user: user=root password="{{ mysql_root_password }}" host=localhost
+
+    # - name: Remove the test database
+    #   mysql_db: name=test state=absent
+
+    # - name: Deletes anonymous MySQL server user for localhost
+    #   mysql_user: user="" state="absent"
+    
+    # - name: Secures the MySQL root user for IPV6 localhost (::1)
+    #   mysql_user: user="root" password="{{ mysql_root_password }}" host="::1"
+
+    # - name: Secures the MySQL root user for IPV4 localhost (127.0.0.1)
+    #   mysql_user: user="root" password="{{ mysql_root_password }}" host="127.0.0.1"
+
+    # - name: Secures the MySQL root user for localhost domain (localhost)
+    #   mysql_user: user="root" password="{{ mysql_root_password }}" host="localhost"   
+
+## installation de PHP
+    - name: PHP install
+      apt:
+        name: php7.0-fpm
+
+    - name: sed lines
+      command: "{{ item }}"
+      with_items:
+        - sudo sed -i 's/;cgi.fix_pathinfo=1/cgi.fix_pathinfo=0/g' /etc/php/7.0/fpm/php.ini
+        - sudo sed -i 's/listen.owner = www-data/listen.owner = nginx/g' /etc/php/7.0/fpm/pool.d/www.conf
+        - sudo sed -i 's/listen.group = www-data/listen.group = nginx/g' /etc/php/7.0/fpm/pool.d/www.conf
+    
+    - name: Create directory if it does not exist
+      ansible.builtin.file:
+        path: /var/www/testlink/
+        state: directory
+        mode: '0755'
+
+    - name: Move file
+      command: sudo mv /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf.disabled
+    
+      - name: Copy our testlink conf file to server
+        copy:
+          src: templates/testlink.conf
+          dest: /etc/nginx/conf.d
+          owner: root
+          group: root
+          mode: 0644
+# ##Configuration de Nginx pour utiliser le processeur PHP
+
+#     - name: create & config testlink.conf
+#       copy:
+#         dest: /etc/nginx/sites-enabled/testlink.conf
+#         content: |      
+#           server{
+#               listen      80;
+#               server_name testlink;
+
+#               access_log  /var/log/nginx/testlink.access.log;
+#               error_log   /var/log/nginx/testlink.error.log;
+
+#               proxy_buffers 16 64k;
+#               proxy_buffer_size 128k;
+
+#               location / {
+#                   proxy_pass  http://127.0.0.1:9000;
+#                   proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+#                   proxy_redirect off;
+
+#                   proxy_set_header    Host            $host;
+#                   proxy_set_header    X-Real-IP       $remote_addr;
+#                   proxy_set_header    X-Forwarded-For $proxy_add_x_forwarded_for;
+#                   proxy_set_header    X-Forwarded-Proto http;
+#               }
+#           }
+
